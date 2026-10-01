@@ -1,0 +1,11 @@
+// Full data model is added in Sprint 1 (see CLAUDE.md section 5).
+// This minimal schema only proves the Prisma -> PostgreSQL connection for Sprint 0.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
