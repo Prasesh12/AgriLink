@@ -1,5 +1,4 @@
-// Full data model is added in Sprint 1 (see CLAUDE.md section 5).
-// This minimal schema only proves the Prisma -> PostgreSQL connection for Sprint 0.
+// AgriLink data model - see CLAUDE.md section 5 for the spec this implements.
 
 generator client {
   provider = "prisma-client-js"
@@ -8,4 +7,375 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  officer
+  farmer
+  buyer
+}
+
+enum Language {
+  en
+  ne
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  rejected
+}
+
+enum Grade {
+  A
+  B
+  C
+}
+
+enum ProductStatus {
+  active
+  sold_out
+  removed
+}
+
+enum OrderStatus {
+  pending_payment
+  confirmed
+  packed
+  dispatched
+  delivered
+  cancelled
+}
+
+enum PaymentGateway {
+  khalti
+  mock
+}
+
+enum PaymentStatus {
+  initiated
+  completed
+  failed
+}
+
+enum BidStatus {
+  pending
+  accepted
+  rejected
+  expired
+}
+
+// Shared by SubsidyApplication and InsuranceClaim - both follow the same review workflow.
+enum ApplicationStatus {
+  submitted
+  under_review
+  approved
+  rejected
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  phone        String   @unique
+  email        String?  @unique
+  passwordHash String
+  role         Role
+  language     Language @default(en)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  farmer        Farmer?
+  officer       Officer?
+  ordersPlaced  Order[]
+  bidsPlaced    Bid[]
+  reviewsGiven  Review[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Farmer {
+  id                 Int                @id @default(autoincrement())
+  userId             Int                @unique
+  citizenshipNo      String             @unique
+  landRegNo          String
+  landArea           Decimal            @db.Decimal(10, 2)
+  district           String
+  documentUrls       String[]
+  verificationStatus VerificationStatus @default(pending)
+  verifiedById       Int?
+  remarks            String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user                User                 @relation(fields: [userId], references: [id])
+  verifiedBy          Officer?             @relation("FarmerVerifiedBy", fields: [verifiedById], references: [id])
+  products            Product[]
+  subsidyApplications SubsidyApplication[]
+  insuranceClaims     InsuranceClaim[]
+  reviewsReceived     Review[]
+
+  @@index([district])
+  @@index([verificationStatus])
+  @@map("farmers")
+}
+
+model Officer {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  office    String
+  district  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user                        User                 @relation(fields: [userId], references: [id])
+  verifiedFarmers             Farmer[]             @relation("FarmerVerifiedBy")
+  mspRatesSet                 MspRate[]
+  subsidyApplicationsReviewed SubsidyApplication[]
+  insuranceClaimsReviewed     InsuranceClaim[]
+
+  @@index([district])
+  @@map("officers")
+}
+
+model Crop {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  nameNe    String
+  category  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mspRates        MspRate[]
+  products        Product[]
+  insuranceClaims InsuranceClaim[]
+
+  @@map("crops")
+}
+
+model MspRate {
+  id         Int      @id @default(autoincrement())
+  cropId     Int
+  grade      Grade
+  ratePerKg  Decimal  @db.Decimal(10, 2)
+  fiscalYear String
+  setById    Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  crop  Crop    @relation(fields: [cropId], references: [id])
+  setBy Officer @relation(fields: [setById], references: [id])
+
+  @@unique([cropId, grade, fiscalYear])
+  @@map("msp_rates")
+}
+
+model Product {
+  id          Int           @id @default(autoincrement())
+  farmerId    Int
+  cropId      Int
+  quantityKg  Decimal       @db.Decimal(10, 2)
+  grade       Grade
+  pricePerKg  Decimal       @db.Decimal(10, 2)
+  harvestDate DateTime
+  description String?
+  imageUrls   String[]
+  status      ProductStatus @default(active)
+  belowMsp    Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  farmer     Farmer      @relation(fields: [farmerId], references: [id])
+  crop       Crop        @relation(fields: [cropId], references: [id])
+  orderItems OrderItem[]
+  bids       Bid[]
+
+  @@index([farmerId])
+  @@index([cropId])
+  @@index([status])
+  @@map("products")
+}
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  buyerId         Int
+  totalAmount     Decimal     @db.Decimal(10, 2)
+  status          OrderStatus @default(pending_payment)
+  deliveryAddress String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  buyer   User        @relation(fields: [buyerId], references: [id])
+  items   OrderItem[]
+  payment Payment?
+  review  Review?
+
+  @@index([buyerId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         Int     @id @default(autoincrement())
+  orderId    Int
+  productId  Int
+  quantityKg Decimal @db.Decimal(10, 2)
+  unitPrice  Decimal @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model Payment {
+  id        Int            @id @default(autoincrement())
+  orderId   Int            @unique
+  gateway   PaymentGateway
+  // Khalti's `pidx` when gateway = khalti, or an internal reference when gateway = mock.
+  txnRef    String?
+  amount    Decimal        @db.Decimal(10, 2)
+  status    PaymentStatus  @default(initiated)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+model Bid {
+  id           Int       @id @default(autoincrement())
+  productId    Int
+  buyerId      Int
+  quantityKg   Decimal   @db.Decimal(10, 2)
+  offeredPrice Decimal   @db.Decimal(10, 2)
+  status       BidStatus @default(pending)
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+  buyer   User    @relation(fields: [buyerId], references: [id])
+
+  @@index([productId])
+  @@index([buyerId])
+  @@index([status])
+  @@map("bids")
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  orderId   Int      @unique
+  farmerId  Int
+  buyerId   Int
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order  Order  @relation(fields: [orderId], references: [id])
+  farmer Farmer @relation(fields: [farmerId], references: [id])
+  buyer  User   @relation(fields: [buyerId], references: [id])
+
+  @@index([farmerId])
+  @@map("reviews")
+}
+
+model SubsidyScheme {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  type        String
+  maxAmount   Decimal  @db.Decimal(10, 2)
+  deadline    DateTime
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  applications SubsidyApplication[]
+
+  @@map("subsidy_schemes")
+}
+
+model SubsidyApplication {
+  id              Int               @id @default(autoincrement())
+  schemeId        Int
+  farmerId        Int
+  officerId       Int?
+  requestedAmount Decimal           @db.Decimal(10, 2)
+  reason          String
+  documentUrls    String[]
+  status          ApplicationStatus @default(submitted)
+  remarks         String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  scheme  SubsidyScheme @relation(fields: [schemeId], references: [id])
+  farmer  Farmer        @relation(fields: [farmerId], references: [id])
+  officer Officer?      @relation(fields: [officerId], references: [id])
+
+  @@index([farmerId])
+  @@index([status])
+  @@map("subsidy_applications")
+}
+
+model InsuranceClaim {
+  id              Int               @id @default(autoincrement())
+  farmerId        Int
+  officerId       Int?
+  cropId          Int
+  lossDescription String
+  lossDate        DateTime
+  photoUrls       String[]
+  claimAmount     Decimal           @db.Decimal(10, 2)
+  approvedAmount  Decimal?          @db.Decimal(10, 2)
+  status          ApplicationStatus @default(submitted)
+  remarks         String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  farmer  Farmer   @relation(fields: [farmerId], references: [id])
+  officer Officer? @relation(fields: [officerId], references: [id])
+  crop    Crop     @relation(fields: [cropId], references: [id])
+
+  @@index([farmerId])
+  @@index([status])
+  @@map("insurance_claims")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int
+  entity     String
+  entityId   Int
+  action     String
+  fromStatus String?
+  toStatus   String?
+  createdAt  DateTime @default(now())
+
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@index([entity, entityId])
+  @@map("audit_logs")
 }
