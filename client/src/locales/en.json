@@ -6,6 +6,63 @@
     "loading": "Loading...",
     "error": "Something went wrong",
     "healthOk": "Server is reachable",
-    "healthError": "Could not reach the server"
+    "healthError": "Could not reach the server",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "viewDocument": "View document"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "verifyFarmers": "Verify Farmers",
+    "logout": "Logout",
+    "loggedInAs": "Logged in as {{name}} ({{role}})",
+    "login": "Login",
+    "register": "Register"
+  },
+  "auth": {
+    "loginTitle": "Login to AgriLink",
+    "registerTitle": "Create an account",
+    "name": "Full name",
+    "phone": "Phone number",
+    "email": "Email (optional)",
+    "password": "Password",
+    "role": "I am a",
+    "roleFarmer": "Farmer",
+    "roleBuyer": "Buyer",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?",
+    "loginLink": "Login",
+    "registerLink": "Register",
+    "loginButton": "Login",
+    "registerButton": "Create account",
+    "loginFailed": "Invalid phone or password",
+    "registerFailed": "Registration failed"
+  },
+  "farmer": {
+    "profileTitle": "Farmer verification profile",
+    "citizenshipNo": "Citizenship number",
+    "landRegNo": "Land registration number",
+    "landArea": "Land area (ropani)",
+    "district": "District",
+    "documents": "Documents (citizenship, land ownership - jpg/png/pdf, up to 5MB each)",
+    "submitProfile": "Submit for verification",
+    "pendingTitle": "Verification pending",
+    "pendingBody": "Your profile has been submitted and is awaiting review by an officer in your district.",
+    "rejectedTitle": "Verification rejected",
+    "rejectedBody": "An officer rejected your profile. Please review the remarks below and resubmit.",
+    "remarks": "Officer remarks",
+    "verifiedTitle": "You're verified!",
+    "verifiedBody": "You can now list produce on the marketplace.",
+    "noProfileTitle": "Complete your farmer profile",
+    "noProfileBody": "Submit your citizenship and land details so an officer in your district can verify you."
+  },
+  "officer": {
+    "verificationQueueTitle": "Farmer verification queue",
+    "statusFilter": "Status",
+    "noFarmers": "No farmers found for this filter.",
+    "verify": "Verify",
+    "reject": "Reject",
+    "remarksPlaceholder": "Remarks (optional for verify, recommended for reject)",
+    "district": "District"
   }
 }
